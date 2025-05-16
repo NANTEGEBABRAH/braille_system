@@ -269,9 +269,9 @@ if __name__ == "__main__":
     # Test cases
     tests = [
         ("n", 'lg'),  # looks for n.wav/mp3/ogg
-        ("nyonyi", 'lg'),  # Will look for nyonyi.wav/mp3/ogg
-        ("mukwano", 'lg'),  # Will look for mukwano.wav/mp3/ogg
-        ("test", 'en')      # English test
+        ("test", 'en'),     #English test, uses text-to-speech
+        ("nyonyi", 'lg'),  #look for nyonyi.wav/mp3/ogg
+        ("mukwano", 'lg'),  #look for mukwano.wav/mp3/ogg
     ]
     
     for text, lang in tests:

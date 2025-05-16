@@ -3,7 +3,7 @@ from audio_system import AudioSystem
 from typing import List, Tuple, Optional, Union
 import json
 import argparse
-import ffmpeg
+import sys
 import time
 from io import BytesIO
 import base64
@@ -26,17 +26,32 @@ COLORS = {
 
 class BrailleToLugandaApp:
     def __init__(self, input_method: str = "keyboard"):
+        # Initialize Pygame
+        pygame.init()
+        pygame.font.init()
+        
+        #set display mode immediately
+        self.screen = pygame.display.set_mode((800, 600), pygame.HWSURFACE | pygame.DOUBLEBUF)
+        pygame.display.set_caption("Braille to Luganda Translator")
+        
+        #initialize mixer
+        try:
+            pygame.mixer.init()
+        except:
+            print("Audio mixer initialization failed")
+        
+        #rest of initialization
+        self._initialize_components(input_method)
+        
+        # Force initial render
+        self._update_display()
+        pygame.display.flip()
+    def _initialize_components(self, input_method):
+            
         self.audio = AudioSystem()
         self.braille_cell_pos = (500, 100)
         self.current_dots = set()
         self.display_text = ""
-        
-        # Initialize Pygame
-        pygame.init()
-        pygame.font.init()
-        pygame.mixer.init()
-        self.screen = pygame.display.set_mode((800, 600), pygame.HWSURFACE | pygame.DOUBLEBUF)
-        pygame.display.set_caption("Braille to Luganda Translator")
 
         # Fonts with multiple fallbacks
         self.font = self._get_font(32)
@@ -68,9 +83,6 @@ class BrailleToLugandaApp:
         # Start input listening
         self._start_input_listening()
         
-        # Force initial render
-        self._update_display()
-        pygame.display.flip()
         print("Window initialized successfully")
         
     def _get_font(self, size):
@@ -182,10 +194,9 @@ class BrailleToLugandaApp:
     def start_listening(self):
         """Main application loop"""
         clock = pygame.time.Clock()
-        self.running = True
+        while self.running:
         
-        try:
-            while self.running:
+            try:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         self.running = False
@@ -194,10 +205,9 @@ class BrailleToLugandaApp:
                 pygame.display.flip()
                 clock.tick(60)
                 
-        except Exception as e:
-            print(f"Runtime error: {e}")
-        finally:
-            self.close()
+            except pygame.error as e:
+                print(f"pygame error:{e}")
+                self.running = False
         
     def _setup_input_method(self, method: str):
         """Initialize the selected input method"""
@@ -294,29 +304,54 @@ class BrailleToLugandaApp:
             
     def close(self):
         """Clean up resources safely"""
-        try:
-            if hasattr(self.input_handler, 'stop'):
-                self.input_handler.stop()
+        
+        if hasattr(self, 'input_handler'):
+            self.input_handler.stop()
             
-            #Clear pygame resources
-            pygame.mixer.stop()
-            pygame.font.quit()
-            pygame.quit()
-                
-            print("Application closed successfully")
-        except Exception as e:
-            print(f"Cleanup error: {e}")
+        # Then pygame
+        if pygame.get_init():
+            pygame.init
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Braille to Luganda Translator')
     parser.add_argument('--input', choices=['keyboard', 'gui', 'physical'],
-                            default='keyboard', help='Input method')
+                        default='keyboard', help='Input method')
     args = parser.parse_args()
 
-    app = BrailleToLugandaApp(input_method=args.input)
+    app = None
     try:
+        # Initialize app with error handling
+        try:
+            app = BrailleToLugandaApp(input_method=args.input)
+        except pygame.error as e:
+            print(f"Failed to initialize Pygame: {e}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"Application initialization failed: {e}")
+            sys.exit(1)
+
+        # Main execution with proper event handling
         app.start_listening()
+
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        print("\nUser interrupted the application")
+    except pygame.error as e:
+        print(f"Pygame runtime error: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
     finally:
-        app.close()
+        # Guaranteed cleanup with error protection
+        if app is not None:
+            try:
+                app.close()
+            except Exception as e:
+                print(f"Error during cleanup: {e}")
+        
+        # Ensure complete pygame shutdown
+        if pygame.get_init():
+            try:
+                pygame.quit()
+            except:
+                pass
+        
+        print("Application shutdown complete")

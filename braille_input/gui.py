@@ -37,6 +37,8 @@ class GUIInput(BrailleInput):
     def _create_window(self):
         """Create the actual visible window with guaranteed visibility"""
         self.root = tk.Tk()
+        if not self.root:
+            return  # Prevent creation if root doesn't exist
         self.root.withdraw()  # Hide until fully initialized
         self._setup_gui_components()
         self._finalize_window()
@@ -97,6 +99,7 @@ class GUIInput(BrailleInput):
 
     def _finalize_window(self):
         """Complete window setup and display"""
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         # Key bindings
         self.root.bind('<KeyPress>', self._on_key_press)
         self.root.bind('<KeyRelease>', self._on_key_release)
@@ -112,23 +115,20 @@ class GUIInput(BrailleInput):
         # Start update loop
         self._start_update_loop()
         self.root.mainloop()
-        
-    def _keep_alive(self):
-        if self._showing:
-            try:
-                self.root.update()
-                self.root.after(100, self._keep_alive)
-            except tk.TclError:
-                self._showing = False
 
     def _start_update_loop(self):
         """Start the GUI update loop"""
-        if self._showing and self.root:
-            try:
-                self._update_display()
-                self._update_loop_id = self.root.after(100, self._start_update_loop)
-            except tk.TclError:
-                self._showing = False
+        if not hasattr(self, 'root') or not self._showing or not self.root:
+            return
+    
+        try:
+            self._update_display()
+            # Store the after ID so we can cancel it later
+            self._update_loop_id = self.root.after(100, self._start_update_loop)
+        except (tk.TclError, AttributeError):
+            # Window was destroyed - stop the loop
+            self._showing = False
+            self._update_loop_id = None
 
     def _handle_dot_press(self, dot: int) -> None:
         """Handle physical or virtual dot button presses."""
@@ -182,18 +182,32 @@ class GUIInput(BrailleInput):
     def get_current_input(self) -> List[int]:
         """Return currently selected dots as a sorted list."""
         return sorted(self.current_dots.copy())
+    
+    def _on_close(self):
+        """Handle window closing properly"""
+        self._showing = False
+        if hasattr(self, '_update_loop_id') and self._update_loop_id:
+            try:
+                self.root.after_cancel(self._update_loop_id)
+            except tk.TclError:
+                pass
+        if self.root:
+            try:
+                self.root.destroy()
+            except tk.TclError:
+                pass
 
     def stop(self) -> None:
-        """Clean up and close the GUI."""
         self._showing = False
         
         if hasattr(self, '_update_loop_id'):
             try:
                 self.root.after_cancel(self._update_loop_id)
-            except:
+            except (tk.TclError, AttributeError):
                 pass
         
-        if self.root:
+        # Destroy window safely
+        if hasattr(self, 'root') and self.root:
             try:
                 if threading.current_thread() is threading.main_thread():
                     self.root.destroy()
@@ -202,5 +216,6 @@ class GUIInput(BrailleInput):
             except tk.Tclerror:
                 pass
             
+        #Cleanup state
         self.current_dots.clear()
         self.callback = None
