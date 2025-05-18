@@ -1,29 +1,10 @@
 from braille_processor import BrailleProcessor
 from typing import List, Tuple
 import re
-import sqlite3
-import sys
-import os
 from pathlib import Path
 
 
 class TranslationEngine:
-    def create_connection():
-        db_path = Path('braille_luganda.db')
-        conn = sqlite3.connect(str(db_path))
-        return conn
-    
-    def get_db_path():
-        """Get database path that works in dev and compiled EXE"""
-        if getattr(sys, 'frozen', False):
-            # Running in PyInstaller bundle
-            base_dir = sys._MEIPASS
-        else:
-            # Running in development
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-    
-        return Path(base_dir) / "database" / "database.sqlite"
-    
     def __init__(self):
         self.processor = BrailleProcessor()
         self.braille_map = {
